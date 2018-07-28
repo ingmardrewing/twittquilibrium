@@ -9,6 +9,7 @@ import (
 	"github.com/dghubble/oauth1"
 )
 
+// Creates initializes and returns a twittquilibrium struct
 func NewTwittquilibrium(accessToken, accessTokenSecret, consumerKey, consumerKeySecret string) *twittquilibrium {
 	tq := new(twittquilibrium)
 	tq.accessToken = accessToken
@@ -31,6 +32,17 @@ type twittquilibrium struct {
 	client            *twitter.Client
 }
 
+// Executes the cleansing, unfollows people who are neiter followers
+// nor verified, nor manually excepted from the disposableUsers
+// Array via the exposed 'KeepFollowing' method
+func (t *twittquilibrium) Clean() {
+	t.RetrieveFollowedUsers()
+	t.AddFollwersToBeKept()
+	t.AddVerifiedUsersToBeKept()
+	t.DisposeOfTheRest()
+}
+
+// creates a twitter client to use for the cleansing
 func (t *twittquilibrium) init() {
 	config := oauth1.NewConfig(t.consumerKey, t.consumerKeySecret)
 	token := oauth1.NewToken(t.accessToken, t.accessTokenSecret)
@@ -38,15 +50,10 @@ func (t *twittquilibrium) init() {
 	t.client = twitter.NewClient(httpClient)
 }
 
+// Accepts twitter handles of users which shall not be
+// unfollowed
 func (t *twittquilibrium) KeepFollowing(userHandle string) {
 	t.exceptUsers[userHandle] = true
-}
-
-func (t *twittquilibrium) Clean() {
-	t.RetrieveFollowedUsers()
-	t.AddFollwersToBeKept()
-	t.AddVerifiedUsersToBeKept()
-	t.DisposeOfTheRest()
 }
 
 // Retreive followed users
