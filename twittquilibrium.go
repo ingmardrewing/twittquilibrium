@@ -39,7 +39,7 @@ func (t *twittquilibrium) Clean() {
 	t.RetrieveFollowedUsers()
 	t.AddFollwersToBeKept()
 	t.AddVerifiedUsersToBeKept()
-	t.DisposeOfTheRest()
+	t.DisposeOfUnwantedFollowedUsers()
 }
 
 // creates a twitter client to use for the cleansing
@@ -59,39 +59,36 @@ func (t *twittquilibrium) KeepFollowing(userHandle string) {
 // Retreive followed users
 func (t *twittquilibrium) RetrieveFollowedUsers() {
 	var cursor int64
-LP:
 	for {
 		friends, _, err := t.client.Friends.List(&twitter.FriendListParams{Count: 200, Cursor: cursor})
 		if err != nil {
 			log.Fatalln(err)
 		}
-		if len(friends.Users) < 200 {
-			break LP
-		}
 		t.disposableUsers = append(t.disposableUsers, friends.Users...)
 		cursor = friends.NextCursor
+
+		if len(friends.Users) < 200 {
+			return
+		}
 	}
 }
 
 // Keep following users, who are following back
 func (t *twittquilibrium) AddFollwersToBeKept() {
 	var cursor int64 = -1
-
-	usrs := []twitter.User{}
-LP:
 	for {
 		followers, _, err := t.client.Followers.List(&twitter.FollowerListParams{Count: 200, Cursor: cursor})
 		if err != nil {
 			log.Fatalln(err)
 		}
-		usrs = append(usrs, followers.Users...)
-		if len(followers.Users) < 200 {
-			break LP
+		for _, u := range followers.Users {
+			t.KeepFollowing(u.ScreenName)
 		}
 		cursor = followers.NextCursor
-	}
-	for _, u := range usrs {
-		t.KeepFollowing(u.ScreenName)
+
+		if len(followers.Users) < 200 {
+			return
+		}
 	}
 }
 
@@ -105,7 +102,7 @@ func (t *twittquilibrium) AddVerifiedUsersToBeKept() {
 }
 
 // Dispose of unwanted followed users
-func (t *twittquilibrium) DisposeOfTheRest() {
+func (t *twittquilibrium) DisposeOfUnwantedFollowedUsers() {
 	for _, disposableUser := range t.disposableUsers {
 		if ok, _ := t.exceptUsers[disposableUser.ScreenName]; !ok {
 			removedUser, _, err := t.client.Friendships.Destroy(&twitter.FriendshipDestroyParams{disposableUser.ScreenName, disposableUser.ID})
